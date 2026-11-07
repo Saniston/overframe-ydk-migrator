@@ -20,6 +20,7 @@ def carregar_layout(caminho):
     texto, _ = _decodificar(Path(caminho).read_bytes())
     mapa = {}
     avisos = []
+    pendentes = 0
     for numero, linha in enumerate(texto.splitlines(), start=1):
         linha = linha.strip()
         if not linha or linha.startswith("#"):
@@ -31,7 +32,11 @@ def carregar_layout(caminho):
             )
             continue
         nome, legado, novo = campos
-        if not legado or not novo:
+        if legado and not novo:
+            # Carta aguardando o preenchimento do código novo.
+            pendentes += 1
+            continue
+        if not legado:
             avisos.append(f"Layout linha {numero} ignorada (código vazio): {linha}")
             continue
         if legado in mapa:
@@ -41,6 +46,8 @@ def carregar_layout(caminho):
             )
             continue
         mapa[legado] = novo
+    if pendentes:
+        avisos.append(f"{pendentes} carta(s) do layout sem código novo foram ignoradas (pendentes).")
     return mapa, avisos
 
 

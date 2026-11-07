@@ -16,6 +16,7 @@ htmlcov/
 
 # Backups created by --backup and local deck copies
 *.bak
+backup_layout/
 *.ydk
 
 # Editors / OS

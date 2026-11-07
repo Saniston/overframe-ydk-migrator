@@ -72,6 +72,7 @@ Isso evita erros de substituição parcial. Como cada linha é uma carta, cada o
 
 - Python 3.9 ou superior
 - Nenhuma dependência externa (apenas biblioteca padrão)
+- Internet apenas para a opção `--atualizar-layout`
 
 ## Instalação
 
@@ -92,8 +93,47 @@ python main.py --pasta "C:\EDOPro\deck" --layout "layout_migracao.txt"
 | `--layout` | Caminho do arquivo de layout de migração. |
 | `--backup` | [Opcional] Cria cópia `.bak` de cada deck antes de alterar. |
 | `--simular` | [Opcional] Apenas mostra o que seria alterado, sem gravar. |
+| `--atualizar-layout` | [Opcional] Gera decks sample e, após confirmação, um novo layout a partir da API do YGOPRODeck, movendo o anterior para `backup_layout` (veja abaixo). Com ele, `--pasta` passa a ser opcional. |
 
 > Os parâmetros opcionais são sugestões. Remova da tabela os que não implementar.
+
+## Atualizar o layout pela API do YGOPRODeck
+
+```bash
+python main.py --layout "layout_migracao.txt" --atualizar-layout [--simular]
+```
+
+Consulta a API oficial do YGOPRODeck (`https://db.ygoprodeck.com/api/v7/cardinfo.php?rarity=Grand Master Rare`), da qual são usados os campos `id` (código legado), `name` (nome do card) e `frameType` (tipo de moldura, para validação).
+
+O **código Overframe é sempre o código legado + 1**:
+
+```
+Borreload Liberator Dragon|27096833|27096834
+```
+
+### Etapas
+
+1. **Decks sample**: são gerados os arquivos `samples/sample_01.ydk`, `sample_02.ydk`, ... ao lado do layout (samples anteriores são removidos). Em cada sample, **cada carta legado aparece seguida da sua versão Overframe**, para comparação lado a lado.
+2. **Conferência**: copie os samples para a pasta de decks do EDOPro e abra-os no editor de decks. Se alguma carta Overframe estiver ausente, em branco ou diferente da legado, o código está errado.
+3. **Confirmação**: a aplicação pergunta se os samples estão corretos. Respondendo `S`, o novo layout é gravado e o anterior é **movido para a pasta `backup_layout`** com data e hora no nome (ex.: `backup_layout/layout_migracao_20261107-153000.txt`). Respondendo `N`, o layout **não é alterado**.
+
+### Regras dos samples
+
+| Seção | Regra |
+|---|---|
+| `#main` | Até 60 linhas (30 pares legado/Overframe). Cartas cujo `frameType` não é de Extra Deck. |
+| `#extra` | Até 14 linhas (7 pares; o limite do jogo é 15). Somente cartas cujo `frameType` contém `fusion`, `synchro`, `xyz` ou `link`. |
+| `!side` | Vazio. |
+
+São gerados quantos samples forem necessários para incluir todas as cartas.
+
+### Observações
+
+- O novo layout contém **somente** as cartas da API; linhas do layout anterior ficam apenas no backup.
+- Cartas sem `frameType` vão para o Main Deck e geram aviso. Também há aviso quando o código Overframe de uma carta coincide com o código legado de outra.
+- Com `--simular`, apenas informa o que seria gerado, sem gravar samples nem layout e sem perguntar nada.
+- Pode ser combinado com `--pasta`: após a confirmação, a migração dos decks segue com o novo layout. Se a confirmação for negada, a execução termina sem migrar.
+- Requer acesso à internet.
 
 ## Uso simplificado (Windows)
 
@@ -134,6 +174,7 @@ Concluído: 7 substituições em 2 decks.
 .
 ├── main.py                  # ponto de entrada (argumentos e orquestração)
 ├── migrador.py              # leitura do layout e substituição nos decks
+├── layout_api.py            # geração do layout e dos samples pela API do YGOPRODeck
 ├── layout_migracao.txt      # arquivo de mapeamento (exemplo)
 ├── migrar.bat               # assistente para usuários leigos (Windows)
 └── README.md
