@@ -72,6 +72,35 @@ echo Python instalado com sucesso.
 
 :python_ok
 
+rem --- Atualizacao opcional do layout pela API do YGOPRODeck ---
+echo.
+echo O layout de migracao pode ser gerado de novo a partir da API do YGOPRODeck
+echo (cartas Grand Master Rare; codigo Overframe = codigo legado + 1).
+echo Serao gerados decks sample na pasta "samples" para voce conferir no EDOPro
+echo antes de gravar o novo layout. O layout atual vai para "backup_layout".
+echo Requer internet.
+echo.
+set "ATU="
+set /p "ATU=Deseja atualizar o layout agora? (S/N): "
+set "ATU=!ATU:~0,1!"
+if /i "!ATU!"=="S" (
+    echo.
+    %PY% main.py --layout "%LAYOUT%" --atualizar-layout
+    if errorlevel 1 (
+        echo.
+        echo O layout nao foi atualizado.
+        set "CONT="
+        set /p "CONT=Deseja continuar a migracao com o layout atual? (S/N): "
+        set "CONT=!CONT:~0,1!"
+        if /i not "!CONT!"=="S" (
+            echo.
+            echo Cancelado. Nenhum deck foi alterado.
+            goto fim
+        )
+    )
+)
+echo.
+
 if not exist "%LAYOUT%" (
     echo ERRO: arquivo de layout nao encontrado:
     echo %LAYOUT%
@@ -85,6 +114,11 @@ if not defined PASTA (
     echo Exemplo: C:\EDOPro\deck
     echo.
     set /p "PASTA=Pasta: "
+)
+if not defined PASTA (
+    echo.
+    echo ERRO: nenhuma pasta foi informada.
+    goto fim
 )
 rem Remove aspas que o usuario possa ter colado
 set "PASTA=!PASTA:"=!"

@@ -142,11 +142,12 @@ Para quem não quer usar a linha de comando, basta usar o `migrar.bat`:
 1. Dê **dois cliques** em `migrar.bat` (ou **arraste a pasta de decks** sobre o arquivo).
 2. Leia o **aviso de responsabilidade** e confirme com `S` que fez backup da pasta de decks.
 3. Se o **Python não estiver instalado**, o assistente pergunta se deseja instalá-lo (via `winget`; sem o `winget`, abre a página de download). Após instalar, pode ser preciso fechar a janela e abrir o `migrar.bat` de novo.
-4. Se não arrastou a pasta, digite o caminho dela (ex.: `C:\EDOPro\deck`).
-5. O assistente mostra primeiro uma **simulação**, sem alterar nada.
-6. Responda `S` para aplicar. Uma cópia `.bak` de cada deck alterado é criada.
+4. O assistente pergunta se deseja **atualizar o layout pela API do YGOPRODeck** (veja [Atualizar o layout pela API do YGOPRODeck](#atualizar-o-layout-pela-api-do-ygoprodeck)). Respondendo `S`, são gerados os decks sample na pasta `samples`; confira-os no EDOPro e confirme para gravar o novo layout. Se a atualização for cancelada ou falhar, o assistente pergunta se deseja continuar a migração com o layout atual.
+5. Se não arrastou a pasta, digite o caminho dela (ex.: `C:\EDOPro\deck`).
+6. O assistente mostra primeiro uma **simulação**, sem alterar nada.
+7. Responda `S` para aplicar. Uma cópia `.bak` de cada deck alterado é criada.
 
-Ele usa o `layout_migracao.txt` da própria pasta do projeto e exige o Python (o próprio assistente oferece a instalação). Para desfazer, remova o `.bak` do nome do arquivo de backup, substituindo o deck alterado.
+Ele usa o `layout_migracao.txt` da própria pasta do projeto (e grava ali as pastas `samples` e `backup_layout`, quando o layout é atualizado) e exige o Python (o próprio assistente oferece a instalação). Para desfazer, remova o `.bak` do nome do arquivo de backup, substituindo o deck alterado.
 
 ## Exemplo de saída
 
