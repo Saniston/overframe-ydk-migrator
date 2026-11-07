@@ -1,0 +1,3 @@
+# nome do card|código legado|código novo
+Dark Magician|46986414|900000001
+Blue-Eyes White Dragon|89631139|900000002
