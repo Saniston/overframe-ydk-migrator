@@ -95,6 +95,19 @@ python main.py --pasta "C:\EDOPro\deck" --layout "layout_migracao.txt"
 
 > Os parâmetros opcionais são sugestões. Remova da tabela os que não implementar.
 
+## Uso simplificado (Windows)
+
+Para quem não quer usar a linha de comando, basta usar o `migrar.bat`:
+
+1. Dê **dois cliques** em `migrar.bat` (ou **arraste a pasta de decks** sobre o arquivo).
+2. Leia o **aviso de responsabilidade** e confirme com `S` que fez backup da pasta de decks.
+3. Se o **Python não estiver instalado**, o assistente pergunta se deseja instalá-lo (via `winget`; sem o `winget`, abre a página de download). Após instalar, pode ser preciso fechar a janela e abrir o `migrar.bat` de novo.
+4. Se não arrastou a pasta, digite o caminho dela (ex.: `C:\EDOPro\deck`).
+5. O assistente mostra primeiro uma **simulação**, sem alterar nada.
+6. Responda `S` para aplicar. Uma cópia `.bak` de cada deck alterado é criada.
+
+Ele usa o `layout_migracao.txt` da própria pasta do projeto e exige o Python (o próprio assistente oferece a instalação). Para desfazer, remova o `.bak` do nome do arquivo de backup, substituindo o deck alterado.
+
 ## Exemplo de saída
 
 ```
@@ -122,6 +135,7 @@ Concluído: 7 substituições em 2 decks.
 ├── main.py                  # ponto de entrada (argumentos e orquestração)
 ├── migrador.py              # leitura do layout e substituição nos decks
 ├── layout_migracao.txt      # arquivo de mapeamento (exemplo)
+├── migrar.bat               # assistente para usuários leigos (Windows)
 └── README.md
 ```
 
@@ -131,6 +145,12 @@ Concluído: 7 substituições em 2 decks.
 - Subpastas da pasta informada **não** são processadas.
 - Códigos legados que não constem no layout permanecem inalterados.
 
-## Licença
+## Licença e responsabilidade
 
-[Defina a licença do projeto]
+O uso desta aplicação é **livre**. Ela existe apenas para auxiliar na migração de dados de outra aplicação (EDOPro) e é fornecida **"como está"**, sem garantias de qualquer tipo.
+
+Antes de executar, observe:
+
+- **Leia o código** (`main.py` e `migrador.py`) para ter certeza do que está prestes a executar. Ele é curto e usa apenas a biblioteca padrão do Python.
+- **Faça backup da pasta de decks inteira** antes de rodar, mesmo usando a opção `--backup` ou o `migrar.bat`.
+- **A responsabilidade por quaisquer dados corrompidos ou perdidos é exclusivamente de quem executa** a aplicação. Os autores não respondem por danos decorrentes do uso.
