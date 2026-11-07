@@ -1,3 +1,51 @@
 # nome do card|código legado|código novo
-Dark Magician|46986414|900000001
-Blue-Eyes White Dragon|89631139|900000002
+Astrograph Sorcerer, the Starfrost Magician|48171151|48171152
+Blue-Eyes White Dragon, the White Phantom Beast|30397786|30397787
+Borreload Liberator Dragon|27096833|27096834
+Clear Wing Synchro Dragon, Four Heavenly Dragons|54603525|54603526
+Crimson Dragon Quetzalcoatl|29053656|29053657
+Cyber Dragon, the Luminous Mech Dragon|66664203|66664204
+Cyber End Dragon, the Final Strike Dragon|30275298|30275299
+Cyberse Code Magician|64865|64866
+Cyberse Contract Witch|37458564|37458565
+Dark Magical Curtain|41350417|41350418
+Dark Magician, the Pharaoh's Servant|88570003|88570004
+Dark Rebellion Xyz Dragon, Four Heavenly Dragons|90091224|90091225
+Decode Talker Integration|74665150|74665151
+Deep-Eyes White Dragon, the Blue Abyss|67886895|67886896
+Favorite HERO Flame Wingman|13243124|13243125
+Favorite HERO Shining Flare Wingman|87758525|87758526
+Future Fusion Nova|92058902|92058903
+Gagaga Girl - Cell Phone Subtraction|48393693|48393694
+Gagaga Magician - Gagaga Magic|12908094|12908095
+Galaxy Defense Robot Orbital 7|91714772|91714773
+Galaxy-Eyes Photon Change Dragon|54725177|54725178
+Horoscope Sorcerer, the Stargazer Magician|1186447|1186448
+Kuriboh - Multiply!|14965712|14965713
+Neo Galaxy-Eyes Photon Dragon - Photon Howling|28331069|28331070
+Number 39: Utopia, Emissary of Light|76504386|76504387
+Odd-Eyes Pendulum Dragon of the Four Heavenly Dragons|75787708|75787709
+Red Dragon Archfiend's Chains|92936364|92936365
+Red Nova Dragon - Burning Soul|65541655|65541656
+Rokket Barrage|53481938|53481939
+Stardust Dragon - Victim Sanctuary|76636978|76636979
+Starjunk Synchron|13021682|13021683
+Starving Venom Fusion Dragon, Four Heavenly Dragons|27118421|27118422
+Synchro Emergency|49415281|49415282
+The Guiding Flute of Summoning Dragons|93871599|93871600
+Triple Borrel Launch|89875646|89875647
+Winged Kuriboh Sabatiel LV10|40237839|40237840
+Chaos Angel|22850702|22850703
+Firewall Dragon Singularity|21637210|21637211
+Prime Photon|31801517|31801518
+Wake Up Your EH|32828466|32828467
+Kurikara|35405755|35405756
+Quasar Dragon|35952884|35952885
+Dark Dragoon|37818794|37818795
+Mirrorjade|44146295|44146296
+Super polymerization|48130397|48130398
+Spirit Charmers|91530236|91530237
+Utopia Dragonar|95134948|95134949
+Goddess of the Closed World|98127546|98127547
+Borrelend Dragon|98630720|98630721
+Red Supernova Dragon|99585850|99585851
