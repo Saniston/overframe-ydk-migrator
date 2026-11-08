@@ -4,8 +4,8 @@ Fontes, nesta ordem:
 1. Yugipedia (página "Extended_art"): lista oficial das cartas com extended art /
    Overframe, lida pela API do MediaWiki.
 2. YGOPRODeck: traduz cada nome no código padrão (legado) e no frameType.
-3. Banco de cartas do EDOPro instalado (.cdb, SQLite): confirma que existe a
-   versão Overframe com código legado + 1 (mesma carta base pelo campo alias).
+3. Banco de cartas do EDOPro instalado (.cdb, SQLite): localiza a versão
+   Overframe em código legado + 1 ou + 2 (mesma carta base pelo campo alias).
 
 Cartas não confirmadas no EDOPro não entram no layout; vão para o arquivo de
 pendências com as artes alternativas encontradas como sugestão. O frameType
@@ -21,7 +21,7 @@ import sqlite3
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -40,6 +40,16 @@ SUFIXO_PENDENCIAS = "_pendencias"
 # Locais comuns de instalação do EDOPro, usados quando a pasta não é deduzida dos decks.
 LOCAIS_EDOPRO = (r"C:\ProjectIgnis", r"D:\ProjectIgnis", r"C:\EDOPro", r"D:\EDOPro")
 
+# Posições possíveis da versão Overframe em relação ao código legado, no EDOPro.
+DESLOCAMENTOS_OVERFRAME = (1, 2)
+
+# Exceções com o código Overframe fixo (legado -> Overframe), para cartas com várias
+# artes perto do código legado, em que a busca por + 1 / + 2 seria ambígua.
+CODIGOS_FIXOS = {
+    "70781052": "70781057",  # Summoned Skull
+    "21522601": "21522603",  # Witchcrafter Madame Verre
+}
+
 # frameTypes que vão para o Extra Deck (ex.: "fusion", "synchro_pendulum", "link").
 TIPOS_EXTRA = ("fusion", "synchro", "xyz", "link")
 MAX_MAIN = 60  # limite do Main Deck
@@ -51,10 +61,8 @@ class Carta:
     codigo: str
     nome: str
     frame_type: str = ""
+    codigo_novo: str = ""  # preenchido por verificar_overframe
 
-    @property
-    def codigo_novo(self):
-        return str(int(self.codigo) + 1)
 
     @property
     def extra(self):
@@ -183,7 +191,13 @@ def carregar_aliases(pasta):
 
 
 def verificar_overframe(cartas, aliases):
-    """Separa as cartas cuja versão legado + 1 existe no EDOPro. Retorna (confirmadas, pendências)."""
+    """Procura no EDOPro a versão Overframe de cada carta. Retorna (confirmadas, pendências).
+
+    A Overframe fica em legado + 1 ou legado + 2, com a mesma carta base. A carta é
+    confirmada (com codigo_novo preenchido) só quando exatamente um desses códigos
+    existe; com os dois, não há como saber qual é a Overframe e ela vira pendência.
+    Cartas de CODIGOS_FIXOS usam o código fixo, desde que ele exista no EDOPro.
+    """
     def base(codigo):
         return aliases.get(codigo) or codigo
 
@@ -191,18 +205,33 @@ def verificar_overframe(cartas, aliases):
     for codigo in aliases:
         artes.setdefault(base(codigo), []).append(codigo)
 
+    faixa = " / ".join(f"+ {d}" for d in DESLOCAMENTOS_OVERFRAME)
     confirmadas, pendencias = [], []
     for carta in cartas:
         legado = int(carta.codigo)
         if legado not in aliases:
             pendencias.append(Pendencia(carta, "código legado não existe no EDOPro"))
             continue
-        novo = legado + 1
-        if novo in aliases and base(novo) == base(legado):
-            confirmadas.append(carta)
+        fixo = CODIGOS_FIXOS.get(carta.codigo)
+        if fixo:
+            if int(fixo) in aliases and base(int(fixo)) == base(legado):
+                confirmadas.append(replace(carta, codigo_novo=fixo))
+            else:
+                pendencias.append(Pendencia(carta, f"código fixo {fixo} não existe no EDOPro"))
+            continue
+        achados = [
+            legado + d for d in DESLOCAMENTOS_OVERFRAME
+            if legado + d in aliases and base(legado + d) == base(legado)
+        ]
+        if len(achados) == 1:
+            confirmadas.append(replace(carta, codigo_novo=str(achados[0])))
             continue
         outras = tuple(str(c) for c in sorted(artes.get(base(legado), [])) if c != legado)
-        pendencias.append(Pendencia(carta, "código legado + 1 não existe no EDOPro", outras))
+        if achados:
+            motivo = f"ambígua: mais de uma arte em código legado {faixa} no EDOPro"
+        else:
+            motivo = f"nenhuma arte em código legado {faixa} no EDOPro"
+        pendencias.append(Pendencia(carta, motivo, outras))
     return confirmadas, pendencias
 
 

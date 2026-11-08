@@ -109,13 +109,34 @@ O layout é montado cruzando três fontes, para que o usuário não precise pree
 |---|---|
 | [Yugipedia — Extended art](https://yugipedia.com/wiki/Extended_art) | Lista das cartas com extended art / Overframe, lida pela API do MediaWiki (`api.php?action=parse&page=Extended_art&prop=wikitext`). |
 | [API do YGOPRODeck](https://db.ygoprodeck.com/api-guide/) | Converte cada nome em `id` (código legado) e `frameType` (seção do deck nos samples), consultando vários nomes por requisição (`name=A\|B\|C`). |
-| Banco de cartas do EDOPro (`expansions/*.cdb` e `repositories/**/*.cdb`) | Confirma que a versão Overframe existe: o código **legado + 1** precisa existir e ser a mesma carta (campo `alias`). |
+| Banco de cartas do EDOPro (`expansions/*.cdb` e `repositories/**/*.cdb`) | Localiza a versão Overframe: um código **legado + 1** ou **legado + 2** que exista e seja a mesma carta (campo `alias`). |
 
-Exemplo de linha gerada:
+### Código Overframe
+
+Na maioria das cartas a Overframe está no código **legado + 1**, mas algumas estão em **legado + 2**. Por isso os dois códigos são verificados no EDOPro antes de qualquer suposição:
+
+| Situação no EDOPro | Resultado |
+|---|---|
+| Só `legado + 1` existe (mesma carta) | Entra no layout com `legado + 1`. |
+| Só `legado + 2` existe (mesma carta) | Entra no layout com `legado + 2`. |
+| `legado + 1` e `legado + 2` existem | Pendência (**ambígua**): não há como saber qual das artes é a Overframe. |
+| Nenhum dos dois existe | Pendência. |
+
+Exemplos de linhas geradas:
 
 ```
 Borreload Liberator Dragon|27096833|27096834
+Witness of the Ancient|54577949|54577951
 ```
+
+#### Códigos fixos
+
+Algumas cartas têm várias artes perto do código legado e a busca por `+ 1` / `+ 2` seria ambígua. Para elas o código Overframe é **fixo** (constante `CODIGOS_FIXOS` em `layout_api.py`), mas continua sendo conferido no EDOPro: se não existir, a carta vai para as pendências.
+
+| Carta | Código legado | Código Overframe |
+|---|---|---|
+| Summoned Skull | 70781052 | 70781057 |
+| Witchcrafter Madame Verre | 21522601 | 21522603 |
 
 ### Pasta do EDOPro
 
@@ -131,12 +152,14 @@ Respondendo `N`, ou se a pasta de decks não estiver dentro do EDOPro, o usuári
 Cartas que não puderam ser confirmadas **não entram no layout**. Elas vão para o arquivo `layout_migracao_pendencias.txt`, ao lado do layout, no mesmo formato, com o código novo em branco e um comentário com o motivo:
 
 ```
-# código legado + 1 não existe no EDOPro
-# outras artes desta carta no EDOPro: 54577951
-Witness of the Ancient|54577949|
+# nenhuma arte em código legado + 1 / + 2 no EDOPro
+# outras artes desta carta no EDOPro: 101403130
+The Winged Dragon of Ra, Sun God of Darkness|101403030|
 ```
 
-- **código legado + 1 não existe no EDOPro**: a Overframe pode usar outro código (veja as outras artes sugeridas) ou ainda não existir no EDOPro.
+- **ambígua**: existem artes em `legado + 1` e em `legado + 2`; confira no EDOPro qual delas é a Overframe (se for definitivo, a carta pode virar um [código fixo](#códigos-fixos)).
+- **código fixo não existe no EDOPro**: o código de `CODIGOS_FIXOS` não está nos bancos do EDOPro instalado (atualize o EDOPro).
+- **nenhuma arte em código legado + 1 / + 2**: a Overframe pode usar outro código (veja as outras artes sugeridas) ou ainda não existir no EDOPro.
 - **código legado não existe no EDOPro**: a carta pode estar no EDOPro com código de pré-lançamento ou ainda não ter sido adicionada.
 - **Não encontradas no YGOPRODeck**: nome sem código legado (carta só OCG, nome diferente ou página que não é carta).
 

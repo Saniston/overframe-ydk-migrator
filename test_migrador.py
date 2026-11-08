@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
+import layout_api
 import main
 from layout_api import (
     CABECALHO,
@@ -83,24 +84,23 @@ class TestMigrador(unittest.TestCase):
 
 
 class TestLayoutApi(unittest.TestCase):
-    def test_carta_codigo_novo_e_secao(self):
-        self.assertEqual(Carta("46986414", "DM", "normal").codigo_novo, "46986415")
+    def test_carta_secao(self):
         for tipo in ("fusion", "synchro_pendulum", "xyz", "link"):
             self.assertTrue(Carta("1", "x", tipo).extra, tipo)
         for tipo in ("effect", "effect_pendulum", "ritual", "spell", ""):
             self.assertFalse(Carta("1", "x", tipo).extra, tipo)
 
     def test_gerar_layout(self):
-        texto = gerar_layout([Carta("10", "Z|x", "effect")])
-        self.assertEqual(texto, CABECALHO + "\nZ/x|10|11\n")
+        texto = gerar_layout([Carta("10", "Z|x", "effect", "12")])
+        self.assertEqual(texto, CABECALHO + "\nZ/x|10|12\n")
 
     def test_validar(self):
-        avisos = validar([Carta("10", "A", "effect"), Carta("11", "B", "")])
+        avisos = validar([Carta("10", "A", "effect", "11"), Carta("11", "B", "", "12")])
         self.assertEqual(len(avisos), 2)  # 10+1 colide com B; B sem frameType
 
     def test_samples_respeitam_limites(self):
-        main = [Carta(str(100 + 2 * i), f"M{i:02d}", "effect") for i in range(31)]
-        extra = [Carta(str(500 + 2 * i), f"E{i:02d}", "xyz") for i in range(15)]
+        main = [Carta(str(100 + 2 * i), f"M{i:02d}", "effect", str(101 + 2 * i)) for i in range(31)]
+        extra = [Carta(str(500 + 2 * i), f"E{i:02d}", "xyz", str(501 + 2 * i)) for i in range(15)]
         samples = gerar_samples(main + extra)
         self.assertEqual(len(samples), 3)  # 15 extras / 7 por sample
         for s in samples:
@@ -179,13 +179,35 @@ class TestLayoutApi(unittest.TestCase):
         self.assertIn("name=a%7CB", m.call_args_list[0][0][0].full_url)
 
     def test_verificar_overframe(self):
-        aliases = {10: 0, 11: 10, 20: 0, 22: 20, 30: 99, 31: 99, 99: 0, 40: 0, 41: 0}
-        cartas = [Carta(str(c), f"C{c}") for c in (10, 20, 30, 40, 50)]
+        aliases = {
+            10: 0, 11: 10,             # + 1
+            20: 0, 22: 20,             # + 2
+            30: 99, 31: 99, 99: 0,     # + 1 pela mesma carta base (alias)
+            40: 0, 41: 0, 42: 0,       # + 1 e + 2 são outras cartas
+            60: 0, 61: 60, 62: 60,     # + 1 e + 2: ambígua
+            70: 0, 75: 70,             # arte fora de + 1 / + 2
+        }
+        cartas = [Carta(str(c), f"C{c}") for c in (10, 20, 30, 40, 50, 60, 70)]
         confirmadas, pendencias = verificar_overframe(cartas, aliases)
-        self.assertEqual([c.codigo for c in confirmadas], ["10", "30"])  # 30: mesma carta base
+        self.assertEqual([(c.codigo, c.codigo_novo) for c in confirmadas],
+                         [("10", "11"), ("20", "22"), ("30", "31")])
         self.assertEqual([(p.carta.codigo, p.sugestoes) for p in pendencias],
-                         [("20", ("22",)), ("40", ()), ("50", ())])  # 41 é outra carta
-        self.assertIn("não existe no EDOPro", pendencias[2].motivo)
+                         [("40", ()), ("50", ()), ("60", ("61", "62")), ("70", ("75",))])
+        motivos = {p.carta.codigo: p.motivo for p in pendencias}
+        self.assertIn("nenhuma arte", motivos["40"])
+        self.assertIn("legado não existe", motivos["50"])
+        self.assertIn("ambígua", motivos["60"])
+
+    def test_verificar_overframe_codigos_fixos(self):
+        aliases = {100: 0, 101: 100, 102: 100, 105: 100, 200: 0, 201: 200}
+        cartas = [Carta("100", "Fixa"), Carta("200", "Fixa ausente")]
+        with mock.patch.dict("layout_api.CODIGOS_FIXOS", {"100": "105", "200": "203"}, clear=True):
+            confirmadas, pendencias = verificar_overframe(cartas, aliases)
+        self.assertEqual([(c.codigo, c.codigo_novo) for c in confirmadas], [("100", "105")])
+        self.assertEqual([p.carta.codigo for p in pendencias], ["200"])  # não cai no + 1
+        self.assertIn("código fixo 203", pendencias[0].motivo)
+        self.assertEqual(layout_api.CODIGOS_FIXOS["70781052"], "70781057")
+        self.assertEqual(layout_api.CODIGOS_FIXOS["21522601"], "21522603")
 
     def _criar_edopro(self, raiz, linhas_por_banco):
         for relativo, linhas in linhas_por_banco.items():

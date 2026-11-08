@@ -88,7 +88,7 @@ def _atualizar_layout(caminho, simular, pasta_decks=None, edopro=None):
 
     print(f"Yugipedia: {len(nomes)} cartas com extended art.")
     print(f"YGOPRODeck: {len(cartas)} encontradas, {len(nao_encontrados)} não encontradas.")
-    print(f"EDOPro ({pasta_edopro}): {len(confirmadas)} confirmadas (código legado + 1), "
+    print(f"EDOPro ({pasta_edopro}): {len(confirmadas)} confirmadas (código legado + 1 ou + 2), "
           f"{len(pendencias)} não confirmadas.")
     if not confirmadas:
         print("Erro: nenhuma carta confirmada no EDOPro; o layout não foi alterado.", file=sys.stderr)

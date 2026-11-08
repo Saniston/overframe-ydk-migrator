@@ -100,7 +100,7 @@ echo.
 echo O layout de migracao pode ser gerado de novo automaticamente:
 echo  - a lista de cartas com extended art vem da Yugipedia;
 echo  - os codigos vem da API do YGOPRODeck;
-echo  - cada codigo Overframe (codigo legado + 1) e confirmado no seu EDOPro.
+echo  - cada codigo Overframe (codigo legado + 1 ou + 2) e localizado no seu EDOPro.
 echo A pasta do EDOPro e deduzida a partir da pasta de decks e voce confirma
 echo (ou informa outra). Cartas nao confirmadas vao para o arquivo
 echo "layout_migracao_pendencias.txt". Serao gerados decks sample na pasta
