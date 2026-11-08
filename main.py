@@ -1,47 +1,110 @@
 """Migra cartas de decks .ydk do EDOPro para as versões Overframe."""
 
 import argparse
+import sqlite3
 import sys
 from pathlib import Path
 
 from layout_api import (
     PASTA_SAMPLES,
+    bancos_edopro,
     buscar_cartas,
+    buscar_nomes_wiki,
     caminho_backup,
+    caminho_pendencias,
+    carregar_aliases,
+    deduzir_pasta_edopro,
     gerar_layout,
+    gerar_pendencias,
     gerar_samples,
     gravar_layout,
+    gravar_pendencias,
     gravar_samples,
     validar,
+    verificar_overframe,
 )
 from migrador import carregar_layout, listar_decks, migrar_deck
 
 
-def _confirmar(pergunta):
+def _perguntar(pergunta):
     try:
-        resposta = input(pergunta)
+        return input(pergunta).strip()
     except EOFError:
+        return ""
+
+
+def _confirmar(pergunta):
+    return _perguntar(pergunta).lower() in ("s", "sim")
+
+
+def _escolher_pasta_edopro(explicita, pasta_decks):
+    """Pasta do EDOPro: a informada em --edopro ou a deduzida, sempre confirmada pelo usuário."""
+    if explicita:
+        pasta = Path(explicita)
+    else:
+        pasta = deduzir_pasta_edopro(pasta_decks)
+        if pasta and _confirmar(f"Pasta do EDOPro encontrada: {pasta}\nUsar esta pasta? (S/N): "):
+            return pasta
+        if not pasta:
+            print("A pasta do EDOPro não foi encontrada automaticamente.")
+        resposta = _perguntar("Informe a pasta do EDOPro (onde fica o EDOPro.exe): ").strip('"')
+        if not resposta:
+            print("Erro: nenhuma pasta do EDOPro foi informada.", file=sys.stderr)
+            return None
+        pasta = Path(resposta)
+    if not pasta.is_dir() or not bancos_edopro(pasta):
+        print(f"Erro: nenhum banco de cartas (.cdb) do EDOPro encontrado em: {pasta}", file=sys.stderr)
+        return None
+    return pasta
+
+
+def _atualizar_layout(caminho, simular, pasta_decks=None, edopro=None):
+    """Monta o layout (Yugipedia + YGOPRODeck + EDOPro), gera os samples e grava após confirmação."""
+    pasta_edopro = _escolher_pasta_edopro(edopro, pasta_decks)
+    if pasta_edopro is None:
         return False
-    return resposta.strip().lower() in ("s", "sim")
 
-
-def _atualizar_layout(caminho, simular):
-    """Busca as cartas na API, gera os samples, pede confirmação e grava o layout."""
     try:
-        cartas = buscar_cartas()
+        nomes = buscar_nomes_wiki()
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        print(f"Erro ao consultar a Yugipedia: {e}", file=sys.stderr)
+        return False
+    try:
+        cartas, nao_encontrados = buscar_cartas(nomes)
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"Erro ao consultar a API do YGOPRODeck: {e}", file=sys.stderr)
         return False
-    for aviso in validar(cartas):
+    try:
+        aliases = carregar_aliases(pasta_edopro)
+    except sqlite3.Error as e:
+        print(f"Erro ao ler os bancos de cartas do EDOPro: {e}", file=sys.stderr)
+        return False
+
+    confirmadas, pendencias = verificar_overframe(cartas, aliases)
+    for aviso in validar(confirmadas):
         print(f"AVISO: {aviso}", file=sys.stderr)
 
+    print(f"Yugipedia: {len(nomes)} cartas com extended art.")
+    print(f"YGOPRODeck: {len(cartas)} encontradas, {len(nao_encontrados)} não encontradas.")
+    print(f"EDOPro ({pasta_edopro}): {len(confirmadas)} confirmadas (código legado + 1), "
+          f"{len(pendencias)} não confirmadas.")
+    if not confirmadas:
+        print("Erro: nenhuma carta confirmada no EDOPro; o layout não foi alterado.", file=sys.stderr)
+        return False
+
     caminho = Path(caminho)
-    extra = sum(1 for c in cartas if c.extra)
-    samples = gerar_samples(cartas)
-    pasta_samples = caminho.parent / PASTA_SAMPLES
+    arquivo_pendencias = caminho_pendencias(caminho)
+    texto_pendencias = gerar_pendencias(pendencias, nao_encontrados)
+    extra = sum(1 for c in confirmadas if c.extra)
+    samples = gerar_samples(confirmadas)
+    # Dentro da pasta de decks, para aparecerem direto no editor de decks do EDOPro
+    # (a migração ignora subpastas, então os samples nunca são migrados).
+    pasta_samples = Path(pasta_decks or pasta_edopro / "deck") / PASTA_SAMPLES
     backup = caminho_backup(caminho)
-    print(f"API: {len(cartas)} cartas ({len(cartas) - extra} do Main Deck, {extra} do Extra Deck).")
-    print("Código Overframe = código legado + 1.")
+    print(f"Layout: {len(confirmadas)} cartas ({len(confirmadas) - extra} do Main Deck, "
+          f"{extra} do Extra Deck).")
+    if texto_pendencias:
+        print(f"Pendências: {len(pendencias) + len(nao_encontrados)} cartas em {arquivo_pendencias}")
 
     if simular:
         print(f"Simulação: seriam gerados {len(samples)} samples em {pasta_samples}")
@@ -58,7 +121,7 @@ def _atualizar_layout(caminho, simular):
     for arquivo in arquivos:
         print(f"  {arquivo.name}")
     print(
-        "\nCopie os samples para a pasta de decks do EDOPro e abra-os no editor de decks.\n"
+        f"\nAbra os samples no editor de decks do EDOPro (pasta \"{PASTA_SAMPLES}\" da lista de decks).\n"
         "Cada carta legado aparece seguida da sua versão Overframe. Se alguma carta\n"
         "Overframe estiver ausente, em branco ou diferente da legado, o código está errado.\n"
     )
@@ -67,13 +130,16 @@ def _atualizar_layout(caminho, simular):
         return False
 
     try:
-        backup = gravar_layout(caminho, gerar_layout(cartas))
+        backup = gravar_layout(caminho, gerar_layout(confirmadas))
+        gravar_pendencias(arquivo_pendencias, texto_pendencias)
     except OSError as e:
         print(f"Erro ao gravar o layout: {e}", file=sys.stderr)
         return False
-    print(f"Layout gerado: {caminho} ({len(cartas)} cartas).")
+    print(f"Layout gerado: {caminho} ({len(confirmadas)} cartas).")
     if backup:
         print(f"Layout anterior movido para: {backup}")
+    if texto_pendencias:
+        print(f"Pendências gravadas em: {arquivo_pendencias}")
     return True
 
 
@@ -86,8 +152,12 @@ def main(argv=None):
     ap.add_argument(
         "--atualizar-layout",
         action="store_true",
-        help="Gera decks sample e, após confirmação, um novo layout com as cartas Grand Master "
-        "Rare da API do YGOPRODeck (o anterior vai para a pasta backup_layout)",
+        help="Gera decks sample e, após confirmação, um novo layout com as cartas de extended art "
+        "da Yugipedia confirmadas no EDOPro (o anterior vai para a pasta backup_layout)",
+    )
+    ap.add_argument(
+        "--edopro",
+        help="Pasta do EDOPro usada por --atualizar-layout (sem ela, a pasta é deduzida e confirmada)",
     )
     args = ap.parse_args(argv)
 
@@ -95,7 +165,7 @@ def main(argv=None):
         ap.error("informe --pasta e/ou --atualizar-layout")
 
     if args.atualizar_layout:
-        if not _atualizar_layout(args.layout, args.simular):
+        if not _atualizar_layout(args.layout, args.simular, args.pasta, args.edopro):
             return 1
         if not args.pasta:
             return 0

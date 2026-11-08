@@ -1,7 +1,9 @@
 import io
 import json
+import sqlite3
 import tempfile
 import unittest
+import urllib.error
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
@@ -9,13 +11,22 @@ from unittest import mock
 import main
 from layout_api import (
     CABECALHO,
+    URL_API,
     Carta,
+    Pendencia,
     buscar_cartas,
+    caminho_pendencias,
+    carregar_aliases,
+    deduzir_pasta_edopro,
+    extrair_nomes,
     gerar_layout,
+    gerar_pendencias,
     gerar_samples,
     gravar_layout,
+    gravar_pendencias,
     gravar_samples,
     validar,
+    verificar_overframe,
 )
 from migrador import carregar_layout, listar_decks, migrar_deck, substituir_conteudo
 
@@ -124,25 +135,160 @@ class TestLayoutApi(unittest.TestCase):
             self.assertEqual(bkp.read_text(encoding="utf-8"), "velho\n")
             self.assertIsNone(gravar_layout(Path(d) / "n.txt", "x\n"))
 
-    def test_buscar_cartas(self):
-        dados = {"data": [{"id": 10, "name": "X", "frameType": "link"}, {"id": 10, "name": "X"}]}
-        resposta = io.BytesIO(json.dumps(dados).encode())
-        with mock.patch("urllib.request.urlopen", return_value=resposta) as m:
-            self.assertEqual(buscar_cartas(), [Carta("10", "X", "link")])
-        self.assertIn("rarity=Grand+Master+Rare", m.call_args[0][0].full_url)
+    def test_extrair_nomes(self):
+        wikitext = (
+            "intro\n* \"[[Fora da Lista]]\"\n"
+            "== List of cards with extended art ==\n"
+            "{| class=\"wikitable\"\n|-\n| \n"
+            "* \"[[Dark Magician, the Pharaoh's Servant]]\"\n"
+            "* \"[[Kuriboh - Multiply!|Kuriboh]]\"\n"
+            "* \"[[Ultimate Sky‎]]\"\n"
+            "* \"[[CHAOS ORIGINS (card)]]\"\n"
+            "* \"[[Ash &amp; Spring]]\"\n"
+            "* \"[[Kuriboh - Multiply!]]\"\n"
+            "| ''[[Limit Over Collection: The Heroes]]''\n"
+            "|}\n== See also ==\n* \"[[Depois da Lista]]\"\n"
+        )
+        self.assertEqual(
+            extrair_nomes(wikitext),
+            ["Dark Magician, the Pharaoh's Servant", "Kuriboh - Multiply!", "Ultimate Sky",
+             "CHAOS ORIGINS", "Ash & Spring"],
+        )
+        with self.assertRaises(ValueError):
+            extrair_nomes("sem a seção")
+
+    def test_buscar_cartas_em_lotes(self):
+        respostas = [
+            {"data": [{"id": 10, "name": "A", "frameType": "link"}, {"id": 20, "name": "B"}]},
+            urllib.error.HTTPError(URL_API, 400, "Bad Request", {}, None),
+        ]
+
+        def falso(req, timeout):
+            r = respostas.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return io.BytesIO(json.dumps(r).encode())
+
+        with mock.patch("urllib.request.urlopen", side_effect=falso) as m:
+            cartas, faltando = buscar_cartas(["a", "B", "C"], lote=2)
+        self.assertEqual(cartas, [Carta("10", "A", "link"), Carta("20", "B", "")])
+        self.assertEqual(faltando, ["C"])
+        self.assertIn("name=a%7CB", m.call_args_list[0][0][0].full_url)
+
+    def test_verificar_overframe(self):
+        aliases = {10: 0, 11: 10, 20: 0, 22: 20, 30: 99, 31: 99, 99: 0, 40: 0, 41: 0}
+        cartas = [Carta(str(c), f"C{c}") for c in (10, 20, 30, 40, 50)]
+        confirmadas, pendencias = verificar_overframe(cartas, aliases)
+        self.assertEqual([c.codigo for c in confirmadas], ["10", "30"])  # 30: mesma carta base
+        self.assertEqual([(p.carta.codigo, p.sugestoes) for p in pendencias],
+                         [("20", ("22",)), ("40", ()), ("50", ())])  # 41 é outra carta
+        self.assertIn("não existe no EDOPro", pendencias[2].motivo)
+
+    def _criar_edopro(self, raiz, linhas_por_banco):
+        for relativo, linhas in linhas_por_banco.items():
+            banco = Path(raiz) / relativo
+            banco.parent.mkdir(parents=True, exist_ok=True)
+            con = sqlite3.connect(banco)
+            con.execute("CREATE TABLE datas (id INTEGER PRIMARY KEY, alias INTEGER)")
+            con.executemany("INSERT INTO datas VALUES (?, ?)", linhas)
+            con.commit()
+            con.close()
+
+    def test_carregar_aliases_e_deduzir_pasta(self):
+        with tempfile.TemporaryDirectory() as d:
+            raiz = Path(d) / "Projeto Ignis"
+            self._criar_edopro(raiz, {
+                "expansions/cards.cdb": [(10, 0), (11, 0)],
+                "repositories/delta/cards.delta.cdb": [(11, 10)],
+            })
+            (raiz / "deck").mkdir()
+            self.assertEqual(carregar_aliases(raiz), {10: 0, 11: 10})  # repositório prevalece
+            self.assertEqual(deduzir_pasta_edopro(raiz / "deck"), raiz)
+            with mock.patch("layout_api.LOCAIS_EDOPRO", ()):
+                self.assertIsNone(deduzir_pasta_edopro(Path(d)))
+
+    def test_pendencias(self):
+        pend = [Pendencia(Carta("20", "B|x"), "motivo", ("22",))]
+        texto = gerar_pendencias(pend, ["Sem Codigo"])
+        linhas = texto.splitlines()
+        self.assertIn("# outras artes desta carta no EDOPro: 22", linhas)
+        self.assertIn("B/x|20|", linhas)
+        self.assertEqual(linhas[-1], "Sem Codigo||")
+        self.assertEqual(gerar_pendencias([], []), "")
+        self.assertEqual(caminho_pendencias(Path("x") / "l.txt"), Path("x") / "l_pendencias.txt")
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "l_pendencias.txt"
+            gravar_pendencias(p, texto)
+            self.assertEqual(p.read_text(encoding="utf-8"), texto)
+            gravar_pendencias(p, "")
+            self.assertFalse(p.exists())
+
+    def _atualizar(self, d, respostas, extra_args=()):
+        """Executa --atualizar-layout com as fontes simuladas e o EDOPro em d/edopro."""
+        self._criar_edopro(Path(d) / "edopro", {"expansions/cards.cdb": [(10, 0), (11, 10), (20, 0)]})
+        layout = Path(d) / "l.txt"
+        layout.write_text("velho\n", encoding="utf-8")
+        cartas = [Carta("10", "A", "effect"), Carta("20", "B", "effect")]
+        saida = io.StringIO()
+        with mock.patch("main.buscar_nomes_wiki", return_value=["A", "B", "C"]), \
+                mock.patch("main.buscar_cartas", return_value=(cartas, ["C"])), \
+                mock.patch("main.deduzir_pasta_edopro", return_value=Path(d) / "edopro"), \
+                mock.patch("builtins.input", side_effect=respostas) as entrada, \
+                mock.patch("sys.stdout", saida), mock.patch("sys.stderr", io.StringIO()):
+            rc = main.main(["--layout", str(layout), "--atualizar-layout", *extra_args])
+        return rc, layout, entrada
+
+    def test_atualizar_grava_layout_e_pendencias(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, layout, entrada = self._atualizar(d, ["s", "s"])
+            self.assertEqual(rc, 0)
+            self.assertIn("Pasta do EDOPro encontrada", entrada.call_args_list[0][0][0])
+            self.assertEqual(layout.read_text(encoding="utf-8"), CABECALHO + "\nA|10|11\n")
+            pend = (Path(d) / "l_pendencias.txt").read_text(encoding="utf-8").splitlines()
+            self.assertIn("B|20|", pend)
+            self.assertIn("C||", pend)
+            self.assertTrue((Path(d) / "backup_layout").exists())
+
+    def test_atualizar_pasta_edopro_recusada_e_invalida(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, layout, _ = self._atualizar(d, ["n", str(Path(d) / "nao_existe")])
+            self.assertEqual(rc, 1)
+            self.assertEqual(layout.read_text(encoding="utf-8"), "velho\n")
+            self.assertFalse((Path(d) / "edopro" / "deck").exists())
+
+    def test_samples_na_pasta_de_decks_informada(self):
+        with tempfile.TemporaryDirectory() as d:
+            decks = Path(d) / "meus decks"
+            decks.mkdir()
+            rc, _, _ = self._atualizar(d, ["s", "s"], ["--pasta", str(decks)])
+            self.assertEqual(rc, 0)
+            self.assertTrue((decks / "samples" / "sample_01.ydk").exists())
+            self.assertFalse((Path(d) / "edopro" / "deck").exists())
+
+    def test_atualizar_pasta_edopro_informada_manualmente(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, _, entrada = self._atualizar(d, ["n", f'"{Path(d) / "edopro"}"', "s"])
+            self.assertEqual(rc, 0)
+            self.assertEqual(entrada.call_count, 3)
 
     def test_cancelar_nao_grava_layout(self):
         with tempfile.TemporaryDirectory() as d:
-            layout = Path(d) / "l.txt"
-            layout.write_text("velho\n", encoding="utf-8")
-            with mock.patch("main.buscar_cartas", return_value=[Carta("10", "A", "effect")]), \
-                    mock.patch("builtins.input", return_value="n"), \
-                    mock.patch("sys.stdout", io.StringIO()):
-                rc = main.main(["--layout", str(layout), "--atualizar-layout"])
+            rc, layout, _ = self._atualizar(d, ["s", "n"])
             self.assertEqual(rc, 1)
             self.assertEqual(layout.read_text(encoding="utf-8"), "velho\n")
-            self.assertTrue((Path(d) / "samples" / "sample_01.ydk").exists())
+            # sem --pasta: samples na pasta de decks do EDOPro
+            self.assertTrue((Path(d) / "edopro" / "deck" / "samples" / "sample_01.ydk").exists())
+            self.assertFalse((Path(d) / "samples").exists())
             self.assertFalse((Path(d) / "backup_layout").exists())
+            self.assertFalse((Path(d) / "l_pendencias.txt").exists())
+
+    def test_simular_nao_grava_layout(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, layout, entrada = self._atualizar(d, [], ["--simular", "--edopro", str(Path(d) / "edopro")])
+            self.assertEqual(rc, 0)
+            self.assertEqual(entrada.call_count, 0)  # --edopro informado: nada a perguntar
+            self.assertEqual(layout.read_text(encoding="utf-8"), "velho\n")
+            self.assertFalse((Path(d) / "edopro" / "deck").exists())
 
 
 if __name__ == "__main__":

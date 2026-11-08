@@ -72,13 +72,17 @@ echo Python instalado com sucesso.
 
 :python_ok
 
-rem --- Atualizacao opcional do layout pela API do YGOPRODeck ---
+rem --- Atualizacao opcional do layout (Yugipedia + YGOPRODeck + EDOPro) ---
 echo.
-echo O layout de migracao pode ser gerado de novo a partir da API do YGOPRODeck
-echo (cartas Grand Master Rare; codigo Overframe = codigo legado + 1).
-echo Serao gerados decks sample na pasta "samples" para voce conferir no EDOPro
-echo antes de gravar o novo layout. O layout atual vai para "backup_layout".
-echo Requer internet.
+echo O layout de migracao pode ser gerado de novo automaticamente:
+echo  - a lista de cartas com extended art vem da Yugipedia;
+echo  - os codigos vem da API do YGOPRODeck;
+echo  - cada codigo Overframe (codigo legado + 1) e confirmado no seu EDOPro.
+echo Sera pedida a pasta do EDOPro. Cartas nao confirmadas vao para o arquivo
+echo "layout_migracao_pendencias.txt". Serao gerados decks sample na pasta
+echo "deck\samples" do EDOPro para voce conferir no editor de decks antes
+echo de gravar o novo layout.
+echo O layout atual vai para "backup_layout". Requer internet.
 echo.
 set "ATU="
 set /p "ATU=Deseja atualizar o layout agora? (S/N): "
