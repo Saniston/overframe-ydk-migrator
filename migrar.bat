@@ -72,16 +72,40 @@ echo Python instalado com sucesso.
 
 :python_ok
 
+rem --- Pasta dos decks: argumento (arrastar e soltar) ou pergunta ---
+echo.
+set "PASTA=%~1"
+if not defined PASTA (
+    echo Informe a pasta onde estao os decks .ydk
+    echo Exemplo: C:\ProjectIgnis\deck
+    echo.
+    set /p "PASTA=Pasta: "
+)
+if not defined PASTA (
+    echo.
+    echo ERRO: nenhuma pasta foi informada.
+    goto fim
+)
+rem Remove aspas que o usuario possa ter colado
+set "PASTA=!PASTA:"=!"
+
+if not exist "!PASTA!\" (
+    echo.
+    echo ERRO: pasta nao encontrada: !PASTA!
+    goto fim
+)
+
 rem --- Atualizacao opcional do layout (Yugipedia + YGOPRODeck + EDOPro) ---
 echo.
 echo O layout de migracao pode ser gerado de novo automaticamente:
 echo  - a lista de cartas com extended art vem da Yugipedia;
 echo  - os codigos vem da API do YGOPRODeck;
 echo  - cada codigo Overframe (codigo legado + 1) e confirmado no seu EDOPro.
-echo Sera pedida a pasta do EDOPro. Cartas nao confirmadas vao para o arquivo
+echo A pasta do EDOPro e deduzida a partir da pasta de decks e voce confirma
+echo (ou informa outra). Cartas nao confirmadas vao para o arquivo
 echo "layout_migracao_pendencias.txt". Serao gerados decks sample na pasta
-echo "deck\samples" do EDOPro para voce conferir no editor de decks antes
-echo de gravar o novo layout.
+echo "samples" dentro da pasta de decks, para voce conferir no editor de decks
+echo do EDOPro antes de gravar o novo layout.
 echo O layout atual vai para "backup_layout". Requer internet.
 echo.
 set "ATU="
@@ -89,7 +113,7 @@ set /p "ATU=Deseja atualizar o layout agora? (S/N): "
 set "ATU=!ATU:~0,1!"
 if /i "!ATU!"=="S" (
     echo.
-    %PY% main.py --layout "%LAYOUT%" --atualizar-layout
+    %PY% main.py --pasta "!PASTA!" --layout "%LAYOUT%" --atualizar-layout --somente-layout
     if errorlevel 1 (
         echo.
         echo O layout nao foi atualizado.
@@ -111,30 +135,7 @@ if not exist "%LAYOUT%" (
     goto fim
 )
 
-rem --- Pasta dos decks: argumento (arrastar e soltar) ou pergunta ---
-set "PASTA=%~1"
-if not defined PASTA (
-    echo Informe a pasta onde estao os decks .ydk
-    echo Exemplo: C:\EDOPro\deck
-    echo.
-    set /p "PASTA=Pasta: "
-)
-if not defined PASTA (
-    echo.
-    echo ERRO: nenhuma pasta foi informada.
-    goto fim
-)
-rem Remove aspas que o usuario possa ter colado
-set "PASTA=!PASTA:"=!"
-
-if not exist "!PASTA!\" (
-    echo.
-    echo ERRO: pasta nao encontrada: !PASTA!
-    goto fim
-)
-
 rem --- Simulacao (nao altera nada) ---
-echo.
 echo --- SIMULACAO: nenhum arquivo sera alterado ---
 echo.
 %PY% main.py --pasta "!PASTA!" --layout "%LAYOUT%" --simular
@@ -146,7 +147,7 @@ if errorlevel 1 (
 
 echo.
 set "RESP="
-set /p "RESP=Deseja aplicar essas alteracoes? Sera criada uma copia .bak de cada deck alterado. (S/N): "
+set /p "RESP=Deseja aplicar essas alteracoes? Sera criada uma copia de cada deck alterado na pasta bak. (S/N): "
 set "RESP=!RESP:~0,1!"
 if /i not "!RESP!"=="S" (
     echo.
@@ -165,7 +166,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo Pronto. Para desfazer, restaure os arquivos .bak (remova o ".bak" do nome).
+echo Pronto. Copias dos decks alterados: !PASTA!\bak
+echo Para desfazer, copie o arquivo .bak de volta para a pasta de decks e remova o ".bak" do nome.
+if exist "%~dp0layout_migracao_pendencias.txt" (
+    echo.
+    echo Algumas cartas com extended art nao foram migradas por falta de confirmacao no EDOPro.
+    echo Veja o arquivo layout_migracao_pendencias.txt na pasta do migrador.
+)
 
 :fim
 echo.

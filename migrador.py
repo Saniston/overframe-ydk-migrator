@@ -4,6 +4,8 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+PASTA_BAK = "bak"  # subpasta da pasta de decks com as cópias .bak (ignorada pela migração)
+
 
 def _decodificar(dados: bytes):
     """Decodifica bytes devolvendo (texto, codificação) para regravar igual."""
@@ -87,7 +89,9 @@ def migrar_deck(caminho, mapa, backup=False, simular=False):
     novo_texto, qtd = substituir_conteudo(texto, mapa)
     if qtd and not simular:
         if backup:
-            shutil.copy2(caminho, caminho.with_name(caminho.name + ".bak"))
+            pasta_bak = caminho.parent / PASTA_BAK
+            pasta_bak.mkdir(exist_ok=True)
+            shutil.copy2(caminho, pasta_bak / (caminho.name + ".bak"))
         # Escrita binária preserva as quebras de linha originais.
         caminho.write_bytes(novo_texto.encode(codificacao))
     return ResultadoDeck(caminho, qtd)

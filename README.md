@@ -84,22 +84,23 @@ cd [NOME-DO-PROJETO]
 ## Uso
 
 ```bash
-python main.py --pasta "C:\EDOPro\deck" --layout "layout_migracao.txt"
+python main.py --pasta "C:\ProjectIgnis\deck" --layout "layout_migracao.txt"
 ```
 
 | Parâmetro | Descrição |
 |---|---|
 | `--pasta` | Pasta onde estão os arquivos `.ydk`. **Somente esta pasta é processada; subpastas são ignoradas.** |
 | `--layout` | Caminho do arquivo de layout de migração. |
-| `--backup` | [Opcional] Cria cópia `.bak` de cada deck antes de alterar. |
+| `--backup` | [Opcional] Antes de alterar cada deck, cria uma cópia `nome.ydk.bak` na subpasta `bak` da pasta de decks (ex.: `C:\ProjectIgnis\deck\bak`). |
 | `--simular` | [Opcional] Apenas mostra o que seria alterado, sem gravar. |
 | `--atualizar-layout` | [Opcional] Gera decks sample e, após confirmação, um novo layout com as cartas de extended art da Yugipedia confirmadas no EDOPro, movendo o anterior para `backup_layout` (veja abaixo). Com ele, `--pasta` passa a ser opcional. |
 | `--edopro` | [Opcional] Pasta de instalação do EDOPro usada por `--atualizar-layout`. Sem ela, a pasta é deduzida e o usuário confirma. |
+| `--somente-layout` | [Opcional] Com `--atualizar-layout` e `--pasta`, usa a pasta de decks apenas para deduzir o EDOPro e gravar os samples, **sem migrar** os decks. |
 
 ## Atualizar o layout automaticamente
 
 ```bash
-python main.py --layout "layout_migracao.txt" --atualizar-layout [--edopro "C:\ProjectIgnis"] [--simular]
+python main.py --pasta "C:\ProjectIgnis\deck" --layout "layout_migracao.txt" --atualizar-layout --somente-layout [--edopro "C:\ProjectIgnis"] [--simular]
 ```
 
 O layout é montado cruzando três fontes, para que o usuário não precise preencher os códigos à mão:
@@ -118,7 +119,12 @@ Borreload Liberator Dragon|27096833|27096834
 
 ### Pasta do EDOPro
 
-Sem `--edopro`, a aplicação procura a pasta do EDOPro (a pasta acima de `--pasta`, ou `C:\ProjectIgnis`, `D:\ProjectIgnis`, `C:\EDOPro`, `D:\EDOPro`) e **sempre pergunta** se deve usá-la. Respondendo `N`, ou se nada for encontrado, o usuário digita o caminho. Sem uma pasta com bancos `.cdb`, o layout não é alterado.
+Sem `--edopro`, a aplicação deduz a pasta do EDOPro e **sempre pergunta** se deve usá-la:
+
+- **Com `--pasta`**: assume que a pasta de decks está dentro da instalação do EDOPro e procura, nela e nas pastas acima, a que contém os bancos `.cdb` (ex.: `C:\ProjectIgnis\deck` → `C:\ProjectIgnis`).
+- **Sem `--pasta`**: procura nos locais comuns (`C:\ProjectIgnis`, `D:\ProjectIgnis`, `C:\EDOPro`, `D:\EDOPro`).
+
+Respondendo `N`, ou se a pasta de decks não estiver dentro do EDOPro, o usuário digita o caminho da instalação. Sem uma pasta com bancos `.cdb`, o layout não é alterado.
 
 ### Pendências
 
@@ -157,7 +163,7 @@ São gerados quantos samples forem necessários para incluir todas as cartas.
 - O novo layout contém **somente** as cartas confirmadas; linhas do layout anterior ficam apenas no backup.
 - Cartas sem `frameType` vão para o Main Deck e geram aviso. Também há aviso quando o código Overframe de uma carta coincide com o código legado de outra.
 - Com `--simular`, apenas informa o que seria gerado, sem gravar samples, layout nem pendências e sem pedir a confirmação dos samples (a pasta do EDOPro continua sendo perguntada, pois os bancos são lidos).
-- Pode ser combinado com `--pasta`: após a confirmação, a migração dos decks segue com o novo layout. Se a confirmação for negada, a execução termina sem migrar.
+- Pode ser combinado com `--pasta`: após a confirmação, a migração dos decks segue com o novo layout (a menos que `--somente-layout` seja informado). Se a confirmação for negada, a execução termina sem migrar.
 - Requer acesso à internet e o EDOPro instalado.
 
 ## Uso simplificado (Windows)
@@ -167,12 +173,28 @@ Para quem não quer usar a linha de comando, basta usar o `migrar.bat`:
 1. Dê **dois cliques** em `migrar.bat` (ou **arraste a pasta de decks** sobre o arquivo).
 2. Leia o **aviso de responsabilidade** e confirme com `S` que fez backup da pasta de decks.
 3. Se o **Python não estiver instalado**, o assistente pergunta se deseja instalá-lo (via `winget`; sem o `winget`, abre a página de download). Após instalar, pode ser preciso fechar a janela e abrir o `migrar.bat` de novo.
-4. O assistente pergunta se deseja **atualizar o layout automaticamente** (veja [Atualizar o layout automaticamente](#atualizar-o-layout-automaticamente)). Respondendo `S`, confirme ou informe a pasta do EDOPro; são gerados os decks sample na pasta `deck\samples` do EDOPro; confira-os no editor de decks e confirme para gravar o novo layout (e as pendências). Se a atualização for cancelada ou falhar, o assistente pergunta se deseja continuar a migração com o layout atual.
-5. Se não arrastou a pasta, digite o caminho dela (ex.: `C:\EDOPro\deck`).
-6. O assistente mostra primeiro uma **simulação**, sem alterar nada.
-7. Responda `S` para aplicar. Uma cópia `.bak` de cada deck alterado é criada.
+4. Se não arrastou a pasta, digite o caminho da pasta de decks (ex.: `C:\ProjectIgnis\deck`).
+5. O assistente pergunta se deseja **atualizar o layout automaticamente** (veja [Atualizar o layout automaticamente](#atualizar-o-layout-automaticamente)). Respondendo `S`:
+   - a pasta do EDOPro é deduzida a partir da pasta de decks; confirme com `S` ou, se não for a correta (ou os decks estiverem fora do EDOPro), digite o caminho da instalação;
+   - são gerados os decks sample na subpasta `samples` da pasta de decks; confira-os no editor de decks do EDOPro e confirme para gravar o novo layout (e as pendências).
 
-Ele usa o `layout_migracao.txt` da própria pasta do projeto (e grava ali a pasta `backup_layout` e o arquivo de pendências, quando o layout é atualizado) e exige o Python (o próprio assistente oferece a instalação). Para desfazer, remova o `.bak` do nome do arquivo de backup, substituindo o deck alterado.
+   Se a atualização for cancelada ou falhar, o assistente pergunta se deseja continuar a migração com o layout atual.
+6. O assistente mostra primeiro uma **simulação**, sem alterar nada.
+7. Responda `S` para aplicar. Uma cópia de cada deck alterado é criada na subpasta `bak` da pasta de decks.
+8. Ao final, se houver cartas sem confirmação no EDOPro, o assistente avisa para consultar o `layout_migracao_pendencias.txt`.
+
+Ele usa o `layout_migracao.txt` da própria pasta do projeto (e grava ali a pasta `backup_layout` e o arquivo de pendências, quando o layout é atualizado) e exige o Python (o próprio assistente oferece a instalação). Para desfazer, copie o arquivo da pasta `bak` de volta para a pasta de decks e remova o `.bak` do nome, substituindo o deck alterado.
+
+### Pastas criadas dentro da pasta de decks
+
+```
+C:\ProjectIgnis\deck\
+├── meu_deck.ydk
+├── bak\         # cópias dos decks antes da migração (meu_deck.ydk.bak)
+└── samples\     # decks sample para conferência (sample_01.ydk, ...)
+```
+
+As duas são subpastas e, por isso, **nunca são processadas** pela migração.
 
 ## Exemplo de saída
 
@@ -189,7 +211,7 @@ Concluído: 7 substituições em 2 decks.
 
 ## Boas práticas
 
-- **Faça backup dos decks** antes da primeira execução, ou use a opção `--backup`.
+- **Faça backup dos decks** antes da primeira execução, ou use a opção `--backup`. Uma nova execução com `--backup` substitui a cópia anterior do mesmo deck na pasta `bak`; guarde-a em outro lugar se quiser preservar o deck original.
 - Linhas do layout com formato inválido (número de campos diferente de 3) são **ignoradas e reportadas**, sem interromper a execução.
 - Códigos legados duplicados no layout geram um **aviso**, pois o resultado seria ambíguo.
 - A leitura e a gravação preservam a **codificação** e as **quebras de linha** originais dos decks.
@@ -212,6 +234,15 @@ Concluído: 7 substituições em 2 decks.
 - A migração não valida se o código novo existe no EDOPro (só a atualização do layout valida). Um código incorreto preenchido à mão no layout produzirá um deck com carta inexistente.
 - Subpastas da pasta informada **não** são processadas.
 - Códigos legados que não constem no layout permanecem inalterados.
+
+## Sites relacionados
+
+| Site | Descrição |
+|---|---|
+| [Project Ignis — EDOPro](https://projectignis.github.io/index.html) | Site oficial do EDOPro, simulador gratuito de Yu-Gi-Oh! mantido pelo Project Ignis. É a aplicação cujos decks (`.ydk`) e bancos de cartas (`.cdb`) este migrador usa. |
+| [YGOPRODeck](https://ygoprodeck.com) | Banco de dados de cartas e site de compartilhamento de decks de Yu-Gi-Oh!. Fornece a [API](https://db.ygoprodeck.com/api-guide/) usada para obter os códigos das cartas. |
+| [YGOPRO](https://ygopro.org) | Site do YGOPRO "The Dawn of a New Era", outro simulador gratuito de Yu-Gi-Oh! baseado no motor ygopro, do qual o EDOPro também deriva. |
+| [Yugipedia — Extended art](https://yugipedia.com/wiki/Extended_art) | Wiki de Yu-Gi-Oh!; a página lista as cartas com extended art / Overframe usadas para montar o layout. |
 
 ## Licença e responsabilidade
 

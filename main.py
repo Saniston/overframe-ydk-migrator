@@ -45,7 +45,9 @@ def _escolher_pasta_edopro(explicita, pasta_decks):
         pasta = deduzir_pasta_edopro(pasta_decks)
         if pasta and _confirmar(f"Pasta do EDOPro encontrada: {pasta}\nUsar esta pasta? (S/N): "):
             return pasta
-        if not pasta:
+        if not pasta and pasta_decks:
+            print(f"A pasta de decks não está dentro de uma instalação do EDOPro: {pasta_decks}")
+        elif not pasta:
             print("A pasta do EDOPro não foi encontrada automaticamente.")
         resposta = _perguntar("Informe a pasta do EDOPro (onde fica o EDOPro.exe): ").strip('"')
         if not resposta:
@@ -159,15 +161,22 @@ def main(argv=None):
         "--edopro",
         help="Pasta do EDOPro usada por --atualizar-layout (sem ela, a pasta é deduzida e confirmada)",
     )
+    ap.add_argument(
+        "--somente-layout",
+        action="store_true",
+        help="Com --atualizar-layout, usa --pasta só para deduzir o EDOPro e gravar os samples, sem migrar",
+    )
     args = ap.parse_args(argv)
 
     if not args.pasta and not args.atualizar_layout:
         ap.error("informe --pasta e/ou --atualizar-layout")
+    if args.somente_layout and not args.atualizar_layout:
+        ap.error("--somente-layout exige --atualizar-layout")
 
     if args.atualizar_layout:
         if not _atualizar_layout(args.layout, args.simular, args.pasta, args.edopro):
             return 1
-        if not args.pasta:
+        if not args.pasta or args.somente_layout:
             return 0
         print()
 

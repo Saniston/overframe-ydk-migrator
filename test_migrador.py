@@ -58,7 +58,10 @@ class TestMigrador(unittest.TestCase):
             r = migrar_deck(deck, {"1": "2"}, backup=True)
             self.assertEqual(r.substituicoes, 1)
             self.assertEqual(deck.read_bytes(), b"\xef\xbb\xbf#main\r\n2\r\n!side\r\n")
-            self.assertTrue((d / "a.ydk.bak").exists())
+            bak = d / "bak" / "a.ydk.bak"
+            self.assertEqual(bak.read_bytes(), b"\xef\xbb\xbf#main\r\n1\r\n!side\r\n")
+            self.assertFalse((d / "a.ydk.bak").exists())
+            self.assertEqual(listar_decks(d), [deck])  # pasta bak ignorada
 
     def test_simular_nao_grava(self):
         with tempfile.TemporaryDirectory() as d:
@@ -201,11 +204,13 @@ class TestLayoutApi(unittest.TestCase):
                 "expansions/cards.cdb": [(10, 0), (11, 0)],
                 "repositories/delta/cards.delta.cdb": [(11, 10)],
             })
-            (raiz / "deck").mkdir()
+            (raiz / "deck" / "torneio").mkdir(parents=True)
             self.assertEqual(carregar_aliases(raiz), {10: 0, 11: 10})  # repositório prevalece
-            self.assertEqual(deduzir_pasta_edopro(raiz / "deck"), raiz)
-            with mock.patch("layout_api.LOCAIS_EDOPRO", ()):
-                self.assertIsNone(deduzir_pasta_edopro(Path(d)))
+            self.assertEqual(deduzir_pasta_edopro(raiz / "deck"), raiz.resolve())
+            self.assertEqual(deduzir_pasta_edopro(raiz / "deck" / "torneio"), raiz.resolve())
+            with mock.patch("layout_api.LOCAIS_EDOPRO", (str(raiz),)):
+                self.assertIsNone(deduzir_pasta_edopro(Path(d)))  # decks fora do EDOPro
+                self.assertEqual(deduzir_pasta_edopro(), raiz)  # sem decks: locais comuns
 
     def test_pendencias(self):
         pend = [Pendencia(Carta("20", "B|x"), "motivo", ("22",))]
@@ -260,10 +265,16 @@ class TestLayoutApi(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             decks = Path(d) / "meus decks"
             decks.mkdir()
-            rc, _, _ = self._atualizar(d, ["s", "s"], ["--pasta", str(decks)])
+            (decks / "a.ydk").write_text("10\n", encoding="utf-8")
+            rc, _, _ = self._atualizar(d, ["s", "s"], ["--pasta", str(decks), "--somente-layout"])
             self.assertEqual(rc, 0)
             self.assertTrue((decks / "samples" / "sample_01.ydk").exists())
             self.assertFalse((Path(d) / "edopro" / "deck").exists())
+            self.assertEqual((decks / "a.ydk").read_text(encoding="utf-8"), "10\n")  # não migrou
+
+    def test_somente_layout_exige_atualizar(self):
+        with mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit):
+            main.main(["--layout", "l.txt", "--pasta", ".", "--somente-layout"])
 
     def test_atualizar_pasta_edopro_informada_manualmente(self):
         with tempfile.TemporaryDirectory() as d:

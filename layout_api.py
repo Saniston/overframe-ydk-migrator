@@ -153,12 +153,16 @@ def bancos_edopro(pasta):
 
 
 def deduzir_pasta_edopro(pasta_decks=None):
-    """Sugere a pasta do EDOPro: a pasta acima da de decks ou um local comum."""
-    candidatos = []
+    """Sugere a pasta do EDOPro.
+
+    Com a pasta de decks, procura a instalação que a contém (ela mesma ou uma pasta
+    acima, ex.: C:\\ProjectIgnis\\deck -> C:\\ProjectIgnis); sem ela, um local comum.
+    """
     if pasta_decks:
-        pasta_decks = Path(pasta_decks)
-        candidatos += [pasta_decks.parent, pasta_decks]
-    candidatos += [Path(p) for p in LOCAIS_EDOPRO]
+        pasta = Path(pasta_decks).resolve()
+        candidatos = [pasta, *pasta.parents]
+    else:
+        candidatos = [Path(p) for p in LOCAIS_EDOPRO]
     for pasta in candidatos:
         if pasta.is_dir() and bancos_edopro(pasta):
             return pasta
